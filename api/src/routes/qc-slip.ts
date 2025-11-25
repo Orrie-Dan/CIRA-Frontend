@@ -116,7 +116,7 @@ export async function qcSlipRoutes(app: FastifyInstance) {
 
         return reply.code(201).send({ qcSlip })
       } catch (error) {
-        app.log.error('Create QC slip error:', error)
+        app.log.error({ err: error }, 'Create QC slip error')
         throw new ApiError(500, 'Failed to create QC slip', 'CREATE_FAILED')
       }
     }
@@ -173,7 +173,7 @@ export async function qcSlipRoutes(app: FastifyInstance) {
 
         return reply.send({ qcSlip })
       } catch (error) {
-        app.log.error('Get QC slip error:', error)
+        app.log.error({ err: error }, 'Get QC slip error')
         throw new ApiError(500, 'Failed to get QC slip', 'FETCH_FAILED')
       }
     }
@@ -294,12 +294,13 @@ export async function qcSlipRoutes(app: FastifyInstance) {
 
         return reply.send({ qcSlip: updated })
       } catch (error) {
-        app.log.error('Approve QC slip error:', error)
+        app.log.error({ err: error }, 'Approve QC slip error')
         throw new ApiError(500, 'Failed to approve QC slip', 'APPROVE_FAILED')
       }
     }
   )
 }
+
 
 
 

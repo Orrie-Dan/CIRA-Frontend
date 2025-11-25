@@ -61,7 +61,6 @@ model Report {
   province      String?
   district      String?
   sector        String?
-  priorityScore Decimal?              @map("priority_score") @db.Decimal(10, 2)
   createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   reporter      UserAccount?          @relation(fields: [reporterId], references: [id], onUpdate: NoAction)

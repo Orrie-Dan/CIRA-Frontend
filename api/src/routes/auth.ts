@@ -342,7 +342,7 @@ export async function authRoutes(app: FastifyInstance) {
         token, // Also return token in response for frontend convenience
       })
     } catch (error) {
-      app.log.error('Login error:', error)
+      app.log.error({ error, stack: error instanceof Error ? error.stack : undefined }, 'Login error')
       throw new ApiError(500, 'Failed to authenticate user', 'INTERNAL_ERROR')
     }
   })

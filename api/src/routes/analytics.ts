@@ -84,8 +84,8 @@ export async function analyticsRoutes(app: FastifyInstance) {
           if (!report.latitude || !report.longitude) return
 
           // Round to grid
-          const gridLat = Math.round(report.latitude / gridSize) * gridSize
-          const gridLng = Math.round(report.longitude / gridSize) * gridSize
+          const gridLat = Math.round(Number(report.latitude) / gridSize) * gridSize
+          const gridLng = Math.round(Number(report.longitude) / gridSize) * gridSize
           const key = `${gridLat},${gridLng}`
 
           if (!grid.has(key)) {
@@ -112,7 +112,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
           gridSize,
         })
       } catch (error) {
-        app.log.error('Heatmap error:', error)
+        app.log.error({ err: error }, 'Heatmap error')
         throw new ApiError(500, 'Failed to generate heatmap data', 'HEATMAP_ERROR')
       }
     }
@@ -272,7 +272,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
           resolutionTimeTrends: resolutionTimes,
         })
       } catch (error) {
-        app.log.error('Trends error:', error)
+        app.log.error({ err: error }, 'Trends error')
         throw new ApiError(500, 'Failed to generate trend data', 'TRENDS_ERROR')
       }
     }
@@ -354,7 +354,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         app.log.info(`Geographic: ${result.provinces.length} provinces, ${result.districts.length} districts, ${result.sectors.length} sectors`)
         return reply.send(result)
       } catch (error) {
-        app.log.error('Geographic error:', error)
+        app.log.error({ err: error }, 'Geographic error')
         throw new ApiError(500, 'Failed to generate geographic data', 'GEOGRAPHIC_ERROR')
       }
     }
@@ -474,7 +474,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         )
         return reply.send(csvContent)
       } catch (error) {
-        app.log.error('CSV export error:', error)
+        app.log.error({ err: error }, 'CSV export error')
         throw new ApiError(500, 'Failed to export CSV', 'EXPORT_ERROR')
       }
     }

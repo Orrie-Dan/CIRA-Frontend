@@ -165,10 +165,10 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // List reports with admin filters
   app.get('/admin/reports', async (req: FastifyRequest, reply) => {
-    app.log.info('Admin reports query:', req.query)
+    app.log.info({ query: req.query }, 'Admin reports query:')
     const parsed = adminListReportsQuerySchema.safeParse(req.query)
     if (!parsed.success) {
-      app.log.warn('Validation failed:', parsed.error.flatten())
+      app.log.warn({ error: parsed.error.flatten() }, 'Validation failed:')
       return reply.code(400).send({
         error: {
           code: 'VALIDATION_ERROR',
@@ -246,6 +246,16 @@ export async function adminRoutes(app: FastifyInstance) {
               take: 1,
               orderBy: { createdAt: 'desc' },
             },
+            photos: {
+              select: {
+                id: true,
+                url: true,
+                caption: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'asc' },
+              take: 3, // Limit to first 3 photos for list view
+            },
           },
         }),
         prisma.report.count({ where }),
@@ -264,6 +274,12 @@ export async function adminRoutes(app: FastifyInstance) {
           latitude: Number(r.latitude),
           longitude: Number(r.longitude),
           district: r.district,
+          photos: r.photos.map((p) => ({
+            id: p.id,
+            url: p.url,
+            caption: p.caption,
+            createdAt: p.createdAt.toISOString(),
+          })),
           sector: r.sector,
           province: r.province,
           createdAt: r.createdAt.toISOString(),
@@ -291,7 +307,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // Assign report to officer or organization
   app.post('/admin/reports/:id/assign', async (req: FastifyRequest<{ Params: { id: string }; Body: unknown }>, reply) => {
     const { id } = req.params
-    app.log.info('Assign request:', { id, body: req.body })
+    app.log.info({ id, body: req.body }, 'Assign request:')
     
     if (!z.string().uuid().safeParse(id).success) {
       return reply.code(400).send({
@@ -322,7 +338,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const parsed = assignReportSchema.extend({ reportId: z.string().uuid() }).omit({ reportId: true }).safeParse(cleanedBody)
     if (!parsed.success) {
-      app.log.warn('Validation failed:', parsed.error.flatten())
+      app.log.warn({ error: parsed.error.flatten() }, 'Validation failed:')
       return reply.code(400).send({
         error: {
           code: 'VALIDATION_ERROR',
@@ -740,7 +756,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/admin/users', async (req: FastifyRequest, reply) => {
     try {
       const role = (req.query as any).role as string | undefined
-      app.log.info('Fetching users with role:', role)
+      app.log.info({ role }, 'Fetching users with role:')
       const where = role ? { role } : {}
 
       const users = await prisma.userAccount.findMany({
@@ -755,8 +771,8 @@ export async function adminRoutes(app: FastifyInstance) {
         },
       })
 
-      app.log.info(`Found ${users.length} users with role filter:`, where)
-      app.log.info('Users:', users.map(u => ({ id: u.id, email: u.email, role: u.role })))
+      app.log.info({ count: users.length, filter: where }, `Found ${users.length} users with role filter:`)
+      app.log.info({ users: users.map(u => ({ id: u.id, email: u.email, role: u.role })) }, 'Users:')
 
       return reply.send({ data: users })
     } catch (error) {
@@ -767,11 +783,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // Create user/officer
   app.post('/admin/users', async (req: FastifyRequest, reply) => {
-    app.log.info('Creating user with data:', req.body)
+    app.log.info({ body: req.body }, 'Creating user with data:')
     
     const parsed = createUserSchema.safeParse(req.body)
     if (!parsed.success) {
-      app.log.warn('Validation failed:', parsed.error.flatten())
+      app.log.warn({ error: parsed.error.flatten() }, 'Validation failed:')
       return reply.code(400).send({
         error: {
           code: 'VALIDATION_ERROR',
@@ -816,7 +832,7 @@ export async function adminRoutes(app: FastifyInstance) {
         role: parsed.data.role || 'officer',
       }
 
-      app.log.info('Creating user with data:', { ...userData, passwordHash: '[HIDDEN]' })
+      app.log.info({ ...userData, passwordHash: '[HIDDEN]' }, 'Creating user with data:')
 
       const user = await prisma.userAccount.create({
         data: userData,
@@ -829,7 +845,7 @@ export async function adminRoutes(app: FastifyInstance) {
         },
       })
 
-      app.log.info('User created successfully:', user.id)
+      app.log.info({ userId: user.id }, 'User created successfully:')
 
       // Log audit event
       const adminUserId = (req.user as any)?.userId
@@ -859,7 +875,7 @@ export async function adminRoutes(app: FastifyInstance) {
   })
 
   // Update user password
-  app.put('/admin/users/:userId/password', { preHandler: authenticateUser }, async (req: FastifyRequest<{ Params: { userId: string }, Body: { password: string } }>, reply) => {
+  app.put('/admin/users/:userId/password', { preHandler: authenticateUser }, async (req: FastifyRequest, reply) => {
     const parsed = updatePasswordSchema.safeParse(req.body)
     if (!parsed.success) {
       return reply.code(400).send({
@@ -873,7 +889,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
 
     try {
-      const { userId } = req.params
+      const { userId } = req.params as { userId: string }
 
       // Check authentication
       if (!req.user) {
@@ -887,7 +903,8 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       // Authorization: Users can only change their own password, unless they're an admin
-      if (req.user.userId !== userId && req.user.role !== 'admin') {
+      const currentUser = req.user as any
+      if (currentUser.userId !== userId && currentUser.role !== 'admin') {
         return reply.code(403).send({
           error: {
             code: 'FORBIDDEN',
@@ -898,11 +915,11 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       // Check if user exists
-      const user = await prisma.userAccount.findUnique({
+      const userToUpdate = await prisma.userAccount.findUnique({
         where: { id: userId },
       })
 
-      if (!user) {
+      if (!userToUpdate) {
         return reply.code(404).send({
           error: {
             code: 'USER_NOT_FOUND',
@@ -921,7 +938,7 @@ export async function adminRoutes(app: FastifyInstance) {
         data: { passwordHash },
       })
 
-      app.log.info('Password updated successfully for user:', userId)
+      app.log.info({ userId }, 'Password updated successfully for user:')
       return reply.code(200).send({
         message: 'Password updated successfully',
       })
@@ -934,8 +951,6 @@ export async function adminRoutes(app: FastifyInstance) {
   // Auto-assign reports to available officers
   app.post('/admin/reports/auto-assign', { preHandler: authenticateUser }, async (req: FastifyRequest, reply) => {
     try {
-      app.log.info('Auto-assign request received', { userId: req.user?.userId, role: req.user?.role })
-      
       // Check authentication (should be handled by middleware, but double-check)
       if (!req.user) {
         app.log.warn('Auto-assign: No user in request')
@@ -948,9 +963,12 @@ export async function adminRoutes(app: FastifyInstance) {
         })
       }
 
+      const currentUser = req.user as any
+      app.log.info({ userId: currentUser?.userId, role: currentUser?.role }, 'Auto-assign request received')
+
       // Check if user is admin
-      if (req.user.role !== 'admin') {
-        app.log.warn('Auto-assign: User is not admin', { userId: req.user.userId, role: req.user.role })
+      if (currentUser.role !== 'admin') {
+        app.log.warn({ userId: currentUser.userId, role: currentUser.role }, 'Auto-assign: User is not admin')
         return reply.code(403).send({
           error: {
             code: 'FORBIDDEN',

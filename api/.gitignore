@@ -33,6 +33,21 @@ Thumbs.db
 *.db
 *.db-journal
 
-# Uploads (if you want to ignore uploaded files)
-# uploads/
+# Uploads (user-uploaded files should not be in git)
+uploads/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Lock files (optional - some teams prefer to commit these)
+# pnpm-lock.yaml
 

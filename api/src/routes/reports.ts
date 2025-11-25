@@ -81,10 +81,10 @@ export async function reportsRoutes(app: FastifyInstance) {
         })
     }
 
-    app.log.info('Creating report with data:', { body: req.body })
+    app.log.info({ body: req.body }, 'Creating report with data:')
     const parsed = createReportSchema.safeParse(req.body)
     if (!parsed.success) {
-      app.log.warn('Validation failed:', parsed.error.flatten())
+      app.log.warn({ error: parsed.error.flatten() }, 'Validation failed:')
       return reply.code(400).send({
         error: {
           code: 'VALIDATION_ERROR',
@@ -109,7 +109,7 @@ export async function reportsRoutes(app: FastifyInstance) {
           province: parsed.data.province,
           district: parsed.data.district,
           sector: parsed.data.sector,
-          reporterId: parsed.data.reporterId,
+          ...(parsed.data.reporterId && { reporterId: parsed.data.reporterId }),
         },
       })
 
@@ -187,7 +187,7 @@ export async function reportsRoutes(app: FastifyInstance) {
       app.log.error(error, 'Failed to create report')
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       const errorStack = error instanceof Error ? error.stack : undefined
-      app.log.error('Error details:', { errorMessage, errorStack, body: req.body })
+      app.log.error({ errorMessage, errorStack, body: req.body }, 'Error details:')
       return reply.code(500).send({
         error: {
           code: 'CREATE_FAILED',
@@ -228,7 +228,21 @@ export async function reportsRoutes(app: FastifyInstance) {
                   sector: { type: 'string', nullable: true },
                   createdAt: { type: 'string', format: 'date-time' },
                   reporterId: { type: 'string', format: 'uuid', nullable: true },
+                  photos: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        url: { type: 'string' },
+                        caption: { type: 'string', nullable: true },
+                        createdAt: { type: 'string', format: 'date-time' },
+                      },
+                      required: ['id', 'url', 'createdAt'],
+                    },
+                  },
                 },
+                required: ['id', 'title', 'description', 'type', 'severity', 'status', 'latitude', 'longitude', 'createdAt', 'photos'],
               },
             },
             meta: {
@@ -304,49 +318,91 @@ export async function reportsRoutes(app: FastifyInstance) {
           take: parsed.data.limit,
           skip: parsed.data.offset,
           orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            type: true,
-            severity: true,
-            status: true,
-            latitude: true,
-            longitude: true,
-            addressText: true,
-            province: true,
-            district: true,
-            sector: true,
-            createdAt: true,
-            reporterId: true,
+          include: {
+            photos: {
+              select: {
+                id: true,
+                url: true,
+                caption: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'asc' },
+              take: 3, // Limit to first 3 photos for list view
+            },
           },
         }),
         prisma.report.count({ where }),
       ])
 
-      return reply.send({
-        data: reports.map((r) => ({
-          id: r.id,
-          title: r.title,
-          description: r.description,
-          type: r.type,
-          severity: r.severity,
-          status: r.status,
-          latitude: Number(r.latitude),
-          longitude: Number(r.longitude),
-          addressText: r.addressText,
-          province: r.province,
-          district: r.district,
-          sector: r.sector,
-          createdAt: r.createdAt.toISOString(),
-          reporterId: r.reporterId,
-        })),
+      // Log first report's photos for debugging
+      if (reports.length > 0) {
+        const firstReport = reports[0]
+        app.log.info({ 
+          reportId: firstReport.id,
+          hasPhotos: 'photos' in firstReport,
+          photosType: typeof firstReport.photos,
+          photosIsArray: Array.isArray(firstReport.photos),
+          photosCount: firstReport.photos?.length || 0,
+          photos: firstReport.photos,
+          allKeys: Object.keys(firstReport)
+        }, 'First report photos check - detailed')
+      }
+
+      const responseData = {
+        data: reports.map((r: any) => {
+          // Ensure photos is always an array
+          const photos = Array.isArray(r.photos) ? r.photos : []
+          
+          const reportData: any = {
+            id: r.id,
+            title: r.title,
+            description: r.description,
+            type: r.type,
+            severity: r.severity,
+            status: r.status,
+            latitude: Number(r.latitude),
+            longitude: Number(r.longitude),
+            addressText: r.addressText,
+            province: r.province,
+            district: r.district,
+            sector: r.sector,
+            createdAt: r.createdAt.toISOString(),
+            reporterId: r.reporterId,
+            photos: photos.map((p: any) => ({
+              id: p.id,
+              url: p.url,
+              caption: p.caption,
+              createdAt: p.createdAt.toISOString(),
+            })),
+          }
+          
+          // Debug log for first report
+          if (r.id === reports[0]?.id) {
+            app.log.info({ 
+              rawPhotos: r.photos,
+              mappedPhotos: reportData.photos,
+              photosLength: reportData.photos.length
+            }, 'First report response data - photos mapping')
+          }
+          
+          return reportData
+        }),
         meta: {
           total,
           limit: parsed.data.limit,
           offset: parsed.data.offset,
         },
-      })
+      }
+      
+      // Log the response to verify photos are included
+      if (responseData.data.length > 0) {
+        app.log.info({ 
+          firstReportPhotos: responseData.data[0].photos,
+          photosCount: responseData.data[0].photos?.length 
+        }, 'Response data photos check')
+      }
+      
+      return reply.send(responseData)
     } catch (error) {
       app.log.error(error, 'Failed to list reports')
       throw new ApiError(500, 'Failed to fetch reports', 'FETCH_FAILED')
@@ -798,7 +854,7 @@ export async function reportsRoutes(app: FastifyInstance) {
         if (filteredRecipients.length > 0) {
           await notifyUsers(
             filteredRecipients,
-            'report_comment',
+            'report_commented',
             'New Comment on Report',
             `A new comment was added to report "${report.title}"`,
             {

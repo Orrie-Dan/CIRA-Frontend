@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
+import { getSectorsByDistrict } from '../data/rwanda-sectors'
 
 const reverseGeocodeQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
@@ -545,6 +546,51 @@ export async function geocodingRoutes(app: FastifyInstance) {
         error: {
           code: 'GEOCODING_ERROR',
           message: 'Internal error during geocoding',
+          requestId: req.id,
+        },
+      })
+    }
+  })
+
+  // Get sectors by district
+  app.get('/geocoding/sectors', async (req: FastifyRequest, reply: FastifyReply) => {
+    const query = req.query as { district?: string }
+    const districtName = query.district
+
+    if (!districtName || districtName.trim().length === 0) {
+      return reply.code(400).send({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'District parameter is required',
+          requestId: req.id,
+        },
+      })
+    }
+
+    try {
+      const sectors = getSectorsByDistrict(districtName.trim())
+      
+      if (sectors.length === 0) {
+        app.log.warn({ district: districtName }, 'No sectors found for district')
+        return reply.send({
+          district: districtName,
+          sectors: [],
+          count: 0,
+          message: 'No sectors found for the specified district',
+        })
+      }
+
+      return reply.send({
+        district: districtName,
+        sectors: sectors.sort(), // Return alphabetically sorted
+        count: sectors.length,
+      })
+    } catch (error) {
+      app.log.error(error, 'Error fetching sectors')
+      return reply.code(500).send({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to fetch sectors',
           requestId: req.id,
         },
       })

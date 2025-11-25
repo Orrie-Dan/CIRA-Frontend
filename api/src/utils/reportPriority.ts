@@ -51,14 +51,16 @@ export async function calculatePriorityScore(reportId: string): Promise<number> 
 
 /**
  * Update priority score for a report
+ * NOTE: Disabled - priority_score column has been removed from the database
  */
 export async function updateReportPriorityScore(reportId: string): Promise<void> {
-  const score = await calculatePriorityScore(reportId)
-  
-  await prisma.report.update({
-    where: { id: reportId },
-    data: { priorityScore: score },
-  })
+  // Priority score functionality has been removed
+  // const score = await calculatePriorityScore(reportId)
+  // 
+  // await prisma.report.update({
+  //   where: { id: reportId },
+  //   data: { priorityScore: score },
+  // })
 }
 
 /**
@@ -73,6 +75,8 @@ export async function updateAllReportPriorityScores(): Promise<void> {
     await updateReportPriorityScore(report.id)
   }
 }
+
+
 
 
 
