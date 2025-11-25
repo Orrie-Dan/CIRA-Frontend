@@ -36,11 +36,12 @@ fs.mkdir(avatarsDir, { recursive: true }).catch(() => {
 export async function authRoutes(app: FastifyInstance) {
   // Register new user
   app.post('/auth/register', async (req: FastifyRequest, reply) => {
-    app.log.info('Registration request received:', { body: { ...req.body, password: req.body?.password ? '[HIDDEN]' : undefined } })
+    const body = req.body as Record<string, unknown>
+    app.log.info({ body: { ...body, password: body?.password ? '[HIDDEN]' : undefined } }, 'Registration request received:')
     
     const parsed = registerSchema.safeParse(req.body)
     if (!parsed.success) {
-      app.log.warn('Validation failed:', parsed.error.flatten())
+      app.log.warn(parsed.error.flatten(), 'Validation failed:')
       const fieldErrors: Record<string, string[]> = {}
       parsed.error.errors.forEach((err) => {
         const path = err.path.join('.')
@@ -106,7 +107,7 @@ export async function authRoutes(app: FastifyInstance) {
         // emailVerified and phoneVerified have defaults in the schema, so we don't need to set them
       }
 
-      app.log.info('Creating user with data:', { ...userData, passwordHash: '[HIDDEN]' })
+      app.log.info({ ...userData, passwordHash: '[HIDDEN]' }, 'Creating user with data:')
 
       const user = await prisma.userAccount.create({
         data: userData,
@@ -135,7 +136,7 @@ export async function authRoutes(app: FastifyInstance) {
           await sendOTPViaEmail(parsed.data.email, otp)
         }
       } catch (error) {
-        app.log.error('Failed to send OTP:', error)
+        app.log.error(error, 'Failed to send OTP:')
         // Continue anyway - OTP is logged in development
       }
 
@@ -157,12 +158,12 @@ export async function authRoutes(app: FastifyInstance) {
         ...(process.env.NODE_ENV !== 'production' && { otp }),
       })
     } catch (error: any) {
-      app.log.error('Registration error:', {
+      app.log.error({
         name: error?.name,
         code: error?.code,
         message: error?.message,
         stack: error?.stack,
-      })
+      }, 'Registration error:')
       
       // Provide more specific error messages
       if (error.code === 'P2002') {
@@ -189,11 +190,11 @@ export async function authRoutes(app: FastifyInstance) {
       
       // Prisma validation errors
       if (error.name === 'PrismaClientValidationError' || error.message?.includes('Unknown argument')) {
-        app.log.error('Prisma validation error:', {
+        app.log.error({
           name: error.name,
           message: error.message,
           code: error.code,
-        })
+        }, 'Prisma validation error:')
         return reply.code(400).send({
           error: {
             code: 'VALIDATION_ERROR',
@@ -376,7 +377,7 @@ export async function authRoutes(app: FastifyInstance) {
 
       return reply.send({ user })
     } catch (error) {
-      app.log.error('Get user error:', error)
+      app.log.error(error, 'Get user error:')
       throw new ApiError(500, 'Failed to get user information', 'INTERNAL_ERROR')
     }
   })
@@ -436,7 +437,7 @@ export async function authRoutes(app: FastifyInstance) {
 
       return reply.send({ user })
     } catch (error) {
-      app.log.error('Update profile error:', error)
+      app.log.error(error, 'Update profile error:')
       throw new ApiError(500, 'Failed to update profile', 'UPDATE_FAILED')
     }
   })
@@ -545,7 +546,7 @@ export async function authRoutes(app: FastifyInstance) {
 
       return reply.send({ user: updatedUser })
     } catch (error) {
-      app.log.error('Avatar upload error:', error)
+      app.log.error(error, 'Avatar upload error:')
       throw new ApiError(500, 'Failed to upload avatar', 'UPLOAD_FAILED')
     }
   })
@@ -574,7 +575,7 @@ export async function authRoutes(app: FastifyInstance) {
 
       return reply.send({ preferences })
     } catch (error) {
-      app.log.error('Get preferences error:', error)
+      app.log.error(error, 'Get preferences error:')
       throw new ApiError(500, 'Failed to get preferences', 'FETCH_FAILED')
     }
   })
@@ -622,7 +623,7 @@ export async function authRoutes(app: FastifyInstance) {
 
       return reply.send({ preferences })
     } catch (error) {
-      app.log.error('Update preferences error:', error)
+      app.log.error(error, 'Update preferences error:')
       throw new ApiError(500, 'Failed to update preferences', 'UPDATE_FAILED')
     }
   })
@@ -717,7 +718,7 @@ export async function authRoutes(app: FastifyInstance) {
         token,
       })
     } catch (error: any) {
-      app.log.error('Google OAuth error:', error)
+      app.log.error(error, 'Google OAuth error:')
       return reply.code(401).send({
         error: {
           code: 'OAUTH_ERROR',
@@ -817,7 +818,7 @@ export async function authRoutes(app: FastifyInstance) {
         token,
       })
     } catch (error: any) {
-      app.log.error('Apple OAuth error:', error)
+      app.log.error(error, 'Apple OAuth error:')
       return reply.code(401).send({
         error: {
           code: 'OAUTH_ERROR',
@@ -888,7 +889,7 @@ export async function authRoutes(app: FastifyInstance) {
           await sendOTPViaEmail(parsed.data.email!, otp)
         }
       } catch (error) {
-        app.log.error('Failed to send OTP:', error)
+        app.log.error(error, 'Failed to send OTP:')
         // Continue anyway
       }
 
@@ -898,7 +899,7 @@ export async function authRoutes(app: FastifyInstance) {
         ...(process.env.NODE_ENV !== 'production' && { otp }),
       })
     } catch (error) {
-      app.log.error('Send OTP error:', error)
+      app.log.error(error, 'Send OTP error:')
       throw new ApiError(500, 'Failed to send verification code', 'SEND_OTP_FAILED')
     }
   })
@@ -1004,7 +1005,7 @@ export async function authRoutes(app: FastifyInstance) {
         verified: true,
       })
     } catch (error) {
-      app.log.error('Verify OTP error:', error)
+      app.log.error(error, 'Verify OTP error:')
       throw new ApiError(500, 'Failed to verify code', 'VERIFY_OTP_FAILED')
     }
   })

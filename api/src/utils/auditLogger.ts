@@ -1,4 +1,5 @@
 import { prisma } from '../prisma'
+import type { Prisma } from '@prisma/client'
 
 export interface AuditLogData {
   userId?: string
@@ -19,7 +20,7 @@ export async function logAuditEvent(data: AuditLogData): Promise<void> {
         action: data.action,
         resourceType: data.resourceType,
         resourceId: data.resourceId,
-        details: data.details || {},
+        details: (data.details || {}) as Prisma.InputJsonValue,
       },
     })
   } catch (error) {

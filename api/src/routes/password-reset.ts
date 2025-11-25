@@ -85,7 +85,7 @@ export async function passwordResetRoutes(app: FastifyInstance) {
         ...(process.env.NODE_ENV !== 'production' && { otp }),
       })
     } catch (error) {
-      app.log.error('Password reset request error:', error)
+      app.log.error(error, 'Password reset request error:')
       throw new ApiError(500, 'Failed to process password reset request', 'RESET_REQUEST_FAILED')
     }
   })
@@ -163,7 +163,7 @@ export async function passwordResetRoutes(app: FastifyInstance) {
         message: 'Password has been reset successfully',
       })
     } catch (error) {
-      app.log.error('Password reset verify error:', error)
+      app.log.error(error, 'Password reset verify error:')
       throw new ApiError(500, 'Failed to reset password', 'RESET_VERIFY_FAILED')
     }
   })

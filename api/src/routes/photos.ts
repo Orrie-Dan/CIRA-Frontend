@@ -36,8 +36,19 @@ export async function photosRoutes(app: FastifyInstance) {
     }
 
     try {
-      const data = await req.file()
-      if (!data) {
+      const parts = req.parts()
+      let fileData: any = null
+      let caption: string | undefined
+
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          fileData = part
+        } else if (part.fieldname === 'caption') {
+          caption = part.value as string
+        }
+      }
+
+      if (!fileData) {
         return reply.code(400).send({
           error: {
             code: 'VALIDATION_ERROR',
@@ -49,7 +60,7 @@ export async function photosRoutes(app: FastifyInstance) {
 
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-      if (!data.mimetype || !allowedTypes.includes(data.mimetype)) {
+      if (!fileData.mimetype || !allowedTypes.includes(fileData.mimetype)) {
         return reply.code(400).send({
           error: {
             code: 'VALIDATION_ERROR',
@@ -61,7 +72,7 @@ export async function photosRoutes(app: FastifyInstance) {
 
       // Validate file size (max 5MB)
       const maxSize = 5 * 1024 * 1024 // 5MB
-      const buffer = await data.toBuffer()
+      const buffer = await fileData.toBuffer()
       if (buffer.length > maxSize) {
         return reply.code(400).send({
           error: {
@@ -76,7 +87,7 @@ export async function photosRoutes(app: FastifyInstance) {
       await fs.mkdir(uploadsDir, { recursive: true })
 
       // Generate unique filename
-      const ext = path.extname(data.filename || '.jpg')
+      const ext = path.extname(fileData.filename || '.jpg')
       const filename = `${reportId}-${Date.now()}${ext}`
       const filepath = path.join(uploadsDir, filename)
 
@@ -88,7 +99,7 @@ export async function photosRoutes(app: FastifyInstance) {
         data: {
           reportId,
           url: `/uploads/${filename}`,
-          caption: data.fields?.caption?.value as string | undefined,
+          caption,
         },
       })
 

@@ -35,7 +35,7 @@ export async function createNotification(input: CreateNotificationInput) {
       type: input.type,
       title: input.title,
       body: input.body,
-      data: input.data || {},
+      data: (input.data || {}) as Prisma.InputJsonValue,
     },
   })
 }
@@ -57,7 +57,7 @@ export async function notifyUsers(
     type,
     title,
     body,
-    data: data || {},
+    data: (data || {}) as Prisma.InputJsonValue,
   }))
 
   return await prisma.notification.createMany({
