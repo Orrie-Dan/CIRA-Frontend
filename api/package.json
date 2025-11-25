@@ -13,7 +13,8 @@
     "create-admin": "tsx scripts/create-admin-user.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@fastify/cookie": "^9.2.0",
