@@ -267,6 +267,21 @@ export async function notificationsRoutes(app: FastifyInstance) {
     }
   })
 
+  // Handle OPTIONS preflight for SSE endpoint
+  app.options('/notifications/stream', async (req, reply) => {
+    const origin = req.headers.origin
+    const isDevelopment = process.env.NODE_ENV !== 'production'
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) || ['http://localhost:3000']
+    
+    if (isDevelopment || !origin || allowedOrigins.includes(origin)) {
+      reply.header('Access-Control-Allow-Origin', origin || '*')
+      reply.header('Access-Control-Allow-Credentials', 'true')
+      reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      reply.header('Access-Control-Allow-Headers', 'Cache-Control')
+    }
+    return reply.code(204).send()
+  })
+
   // SSE endpoint for real-time notifications
   app.get('/notifications/stream', {
     schema: {
@@ -311,6 +326,18 @@ export async function notificationsRoutes(app: FastifyInstance) {
     reply.raw.setHeader('Cache-Control', 'no-cache')
     reply.raw.setHeader('Connection', 'keep-alive')
     reply.raw.setHeader('X-Accel-Buffering', 'no') // Disable nginx buffering
+    
+    // Set CORS headers explicitly for SSE (EventSource requires these)
+    const origin = req.headers.origin
+    const isDevelopment = process.env.NODE_ENV !== 'production'
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) || ['http://localhost:3000']
+    
+    if (isDevelopment || !origin || allowedOrigins.includes(origin)) {
+      reply.raw.setHeader('Access-Control-Allow-Origin', origin || '*')
+      reply.raw.setHeader('Access-Control-Allow-Credentials', 'true')
+      reply.raw.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      reply.raw.setHeader('Access-Control-Allow-Headers', 'Cache-Control')
+    }
 
     const connection = {
       send: (data: string) => {
