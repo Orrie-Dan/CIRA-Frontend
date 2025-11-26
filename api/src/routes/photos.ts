@@ -50,6 +50,7 @@ export async function photosRoutes(app: FastifyInstance) {
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
       if (!fileData.mimetype || !allowedTypes.includes(fileData.mimetype)) {
+        app.log.warn({ mimetype: fileData.mimetype, reportId }, 'Invalid file type')
         return reply.code(400).send({
           error: {
             code: 'VALIDATION_ERROR',
@@ -72,23 +73,83 @@ export async function photosRoutes(app: FastifyInstance) {
         })
       }
 
+      app.log.info({ reportId, fileSize: buffer.length, mimetype: fileData.mimetype }, 'Starting photo upload')
+
       // Upload to Cloudinary
-      const uploadResult = await uploadToCloudinary(buffer, `reports/${reportId}`, {
-        resource_type: 'image',
-        transformation: [
-          { quality: 'auto' },
-          { fetch_format: 'auto' },
-        ],
-      })
+      let uploadResult
+      try {
+        uploadResult = await uploadToCloudinary(buffer, `reports/${reportId}`, {
+          resource_type: 'image',
+          transformation: [
+            { quality: 'auto' },
+            { fetch_format: 'auto' },
+          ],
+        })
+        app.log.info({ reportId, publicId: uploadResult.public_id }, 'Cloudinary upload successful')
+      } catch (cloudinaryError: any) {
+        app.log.error({ 
+          error: cloudinaryError, 
+          reportId,
+          message: cloudinaryError?.message,
+          httpCode: cloudinaryError?.http_code,
+        }, 'Cloudinary upload failed')
+        return reply.code(500).send({
+          error: {
+            code: 'CLOUDINARY_UPLOAD_FAILED',
+            message: cloudinaryError?.message || 'Failed to upload image to storage service',
+            requestId: req.id,
+            ...(process.env.NODE_ENV !== 'production' && {
+              debug: {
+                httpCode: cloudinaryError?.http_code,
+                name: cloudinaryError?.name,
+              },
+            }),
+          },
+        })
+      }
 
       // Create database record with Cloudinary URL
-      const photo = await prisma.reportPhoto.create({
-        data: {
+      let photo
+      try {
+        photo = await prisma.reportPhoto.create({
+          data: {
+            reportId,
+            url: uploadResult.secure_url,
+            caption,
+          },
+        })
+        app.log.info({ reportId, photoId: photo.id }, 'Photo record created successfully')
+      } catch (dbError: any) {
+        app.log.error({ 
+          error: dbError, 
           reportId,
-          url: uploadResult.secure_url, // Use secure_url (HTTPS)
-          caption,
-        },
-      })
+          uploadResult,
+          message: dbError?.message,
+          code: dbError?.code,
+        }, 'Failed to save photo to database')
+        
+        // Try to clean up Cloudinary upload if database save fails
+        try {
+          await deleteFromCloudinary(uploadResult.public_id)
+          app.log.info({ publicId: uploadResult.public_id }, 'Cleaned up Cloudinary upload after DB failure')
+        } catch (cleanupError) {
+          app.log.warn({ error: cleanupError, publicId: uploadResult.public_id }, 'Failed to clean up Cloudinary upload')
+        }
+        
+        return reply.code(500).send({
+          error: {
+            code: 'DATABASE_ERROR',
+            message: 'Failed to save photo record',
+            requestId: req.id,
+            ...(process.env.NODE_ENV !== 'production' && {
+              debug: {
+                message: dbError?.message,
+                code: dbError?.code,
+              },
+            }),
+          },
+        })
+      }
 
       return reply.code(201).send({
         id: photo.id,
@@ -96,9 +157,41 @@ export async function photosRoutes(app: FastifyInstance) {
         caption: photo.caption,
         createdAt: photo.createdAt.toISOString(),
       })
-    } catch (error) {
-      app.log.error(error, 'Failed to upload photo')
-      throw new ApiError(500, 'Failed to upload photo', 'UPLOAD_FAILED')
+    } catch (error: any) {
+      app.log.error({ 
+        error, 
+        reportId,
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+      }, 'Failed to upload photo - unexpected error')
+      
+      // Check if it's a multipart parsing error
+      if (error.code === 'FST_ERR_MULTIPART_INVALID_CONTENT_TYPE' || 
+          error.message?.includes('multipart') ||
+          error.message?.includes('boundary')) {
+        return reply.code(400).send({
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Invalid multipart request format',
+            requestId: req.id,
+          },
+        })
+      }
+      
+      return reply.code(500).send({
+        error: {
+          code: 'UPLOAD_FAILED',
+          message: error?.message || 'Failed to upload photo',
+          requestId: req.id,
+          ...(process.env.NODE_ENV !== 'production' && {
+            debug: {
+              name: error?.name,
+              message: error?.message?.substring(0, 200),
+            },
+          }),
+        },
+      })
     }
   })
 
