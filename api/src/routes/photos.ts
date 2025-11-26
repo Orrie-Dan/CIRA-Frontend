@@ -25,19 +25,10 @@ export async function photosRoutes(app: FastifyInstance) {
     }
 
     try {
-      const parts = req.parts()
-      let fileData: any = null
-      let caption: string | undefined
-
-      for await (const part of parts) {
-        if (part.type === 'file') {
-          fileData = part
-        } else if (part.fieldname === 'caption') {
-          caption = part.value as string
-        }
-      }
-
-      if (!fileData) {
+      // Use req.file() for the file (like avatar upload which works)
+      // Get caption from query parameter or form field
+      const data = await req.file()
+      if (!data) {
         return reply.code(400).send({
           error: {
             code: 'VALIDATION_ERROR',
@@ -47,10 +38,13 @@ export async function photosRoutes(app: FastifyInstance) {
         })
       }
 
+      // Get caption from query parameter (fallback to empty string)
+      const caption = (req.query as any)?.caption || undefined
+
       // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-      if (!fileData.mimetype || !allowedTypes.includes(fileData.mimetype)) {
-        app.log.warn({ mimetype: fileData.mimetype, reportId }, 'Invalid file type')
+      if (!data.mimetype || !allowedTypes.includes(data.mimetype)) {
+        app.log.warn({ mimetype: data.mimetype, reportId }, 'Invalid file type')
         return reply.code(400).send({
           error: {
             code: 'VALIDATION_ERROR',
@@ -62,7 +56,7 @@ export async function photosRoutes(app: FastifyInstance) {
 
       // Validate file size (max 5MB)
       const maxSize = 5 * 1024 * 1024 // 5MB
-      const buffer = await fileData.toBuffer()
+      const buffer = await data.toBuffer()
       if (buffer.length > maxSize) {
         return reply.code(400).send({
           error: {
@@ -73,7 +67,7 @@ export async function photosRoutes(app: FastifyInstance) {
         })
       }
 
-      app.log.info({ reportId, fileSize: buffer.length, mimetype: fileData.mimetype }, 'Starting photo upload')
+      app.log.info({ reportId, fileSize: buffer.length, mimetype: data.mimetype }, 'Starting photo upload')
 
       // Upload to Cloudinary
       let uploadResult
