@@ -46,8 +46,8 @@ export function Hero() {
               className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary min-w-[200px] bg-transparent"
             >
               <Link href="/track-status">
-                <FileSearch className="mr-2 h-5 w-5" />
-                Check Report Status
+              <FileSearch className="mr-2 h-5 w-5" />
+              Check Report Status
               </Link>
             </Button>
           </div>
