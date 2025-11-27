@@ -40,12 +40,15 @@ export function Hero() {
               </Link>
             </Button>
             <Button
+              asChild
               size="lg"
               variant="outline"
               className="border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary min-w-[200px] bg-transparent"
             >
-              <FileSearch className="mr-2 h-5 w-5" />
-              Check Report Status
+              <Link href="/track-status">
+                <FileSearch className="mr-2 h-5 w-5" />
+                Check Report Status
+              </Link>
             </Button>
           </div>
         </div>

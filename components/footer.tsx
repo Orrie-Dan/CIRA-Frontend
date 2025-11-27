@@ -1,4 +1,5 @@
 import { Mail, Phone } from "lucide-react"
+import Link from "next/link"
 
 export function Footer() {
   return (
@@ -33,9 +34,9 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary-foreground transition-colors">
+                <Link href="/track-status" className="hover:text-primary-foreground transition-colors">
                   Check Status
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className="hover:text-primary-foreground transition-colors">

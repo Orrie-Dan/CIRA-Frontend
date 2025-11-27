@@ -260,9 +260,13 @@ export function MapSection() {
         total: prev.total + 1,
       }))
 
+      // Helper function to get short ID from UUID (first 8 characters)
+      const getShortId = (uuid: string) => uuid.split('-')[0]
+
       toast({
-        title: 'Success',
-        description: 'Report submitted successfully!',
+        title: 'Report Submitted Successfully!',
+        description: `Your report ID is: ${getShortId(report.id)}. Save this to track your report status.`,
+        duration: 10000, // Show for 10 seconds
       })
 
       setShowReportForm(false)
