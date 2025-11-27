@@ -271,7 +271,7 @@ export async function notificationsRoutes(app: FastifyInstance) {
   app.options('/notifications/stream', async (req, reply) => {
     const origin = req.headers.origin
     const isDevelopment = process.env.NODE_ENV !== 'production'
-    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) || ['http://localhost:3000']
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) || ['https://cira-frontend-nu.vercel.app/']
     
     if (isDevelopment || !origin || allowedOrigins.includes(origin)) {
       reply.header('Access-Control-Allow-Origin', origin || '*')
@@ -330,7 +330,7 @@ export async function notificationsRoutes(app: FastifyInstance) {
     // Set CORS headers explicitly for SSE (EventSource requires these)
     const origin = req.headers.origin
     const isDevelopment = process.env.NODE_ENV !== 'production'
-    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) || ['http://localhost:3000']
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) || ['https://cira-frontend-nu.vercel.app/']
     
     if (isDevelopment || !origin || allowedOrigins.includes(origin)) {
       reply.raw.setHeader('Access-Control-Allow-Origin', origin || '*')

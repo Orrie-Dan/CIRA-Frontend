@@ -110,7 +110,7 @@ await app.register(cors, {
     
     // In production, use allowed origins
     const allowed = (process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean)) || [
-      'http://localhost:3000',
+      'https://cira-frontend-nu.vercel.app/',
     ]
     if (!origin || allowed.includes(origin)) {
       cb(null, true)
