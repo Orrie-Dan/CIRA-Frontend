@@ -139,8 +139,20 @@ function TrackStatusForm() {
 // Main page component with Suspense boundary
 export default function TrackStatusPage() {
   return (
-    <div className="min-h-screen bg-background py-12 px-4">
-      <div className="container mx-auto max-w-2xl">
+    <div className="min-h-screen w-full bg-slate-900 relative">
+      {/* Background hero image */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: "url('/Infrastructure.jpg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      />
+      {/* Soft overlay */}
+      <div className="absolute inset-0 bg-slate-950/40" />
+
+      <div className="relative container mx-auto max-w-2xl py-12 px-4">
         <Suspense fallback={
           <Card>
             <CardHeader className="text-center">
