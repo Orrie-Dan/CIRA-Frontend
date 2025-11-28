@@ -8,3 +8,4 @@ ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT false NOT NULL;
 
 
 
+

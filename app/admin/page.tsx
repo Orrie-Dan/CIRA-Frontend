@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { apiGetAdminReports, apiUpdateReportStatus, apiAssignReport, apiGetUsers, apiGetOrganizations, apiGetOfficerMetrics, apiAutoAssignReports, apiGetGeographicData, type AdminReport, type OfficerMetrics, type GeographicData } from '@/lib/api'
+import { useRouter } from 'next/navigation'
+import { apiGetAdminReports, apiUpdateReportStatus, apiAssignReport, apiGetUsers, apiGetOrganizations, apiGetOfficerMetrics, apiAutoAssignReports, apiGetGeographicData, apiMe, type AdminReport, type OfficerMetrics, type GeographicData } from '@/lib/api'
 import { AdminSidebar } from '@/components/admin-sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -137,6 +138,9 @@ function createSeverityIcon(severity: string) {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   const [reports, setReports] = useState<AdminReport[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -196,6 +200,26 @@ export default function AdminDashboard() {
   }, [])
   const reportsTableRef = useRef<HTMLDivElement>(null)
 
+  // Check authentication before rendering
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { user } = await apiMe()
+        if (user.role !== 'admin') {
+          router.push('/login')
+          return
+        }
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error('Authentication failed:', error)
+        router.push('/login')
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+    checkAuth()
+  }, [router])
+
   // Load Leaflet on client side only
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -206,11 +230,13 @@ export default function AdminDashboard() {
   }, [])
 
   useEffect(() => {
-    fetchReports()
-    fetchUsersAndOrgs()
-    fetchOfficerMetrics()
-    fetchGeographicData()
-  }, [])
+    if (isAuthenticated) {
+      fetchReports()
+      fetchUsersAndOrgs()
+      fetchOfficerMetrics()
+      fetchGeographicData()
+    }
+  }, [isAuthenticated])
 
   // Debug: Log users state changes
   useEffect(() => {
@@ -572,6 +598,19 @@ export default function AdminDashboard() {
   useEffect(() => {
     setCurrentPage(1)
   }, [filterProvince, filterDistrict, filterSector, filterStatus, filterType, filterSeverity, searchQuery, dateRange])
+
+  // Don't render content until authenticated
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="text-white">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null // Will redirect
+  }
 
   // Reports by status
   const statusData = [

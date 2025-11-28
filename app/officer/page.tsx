@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { apiGetAdminReports, apiMe, type AdminReport } from '@/lib/api'
 import { AdminSidebar } from '@/components/admin-sidebar'
 import { Button } from '@/components/ui/button'
@@ -54,6 +55,9 @@ function getTypeDisplayName(type: string): string {
 }
 
 export default function OfficerDashboard() {
+  const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   const [currentOfficerId, setCurrentOfficerId] = useState<string>('')
   const [currentOfficerName, setCurrentOfficerName] = useState<string>('')
   const [reports, setReports] = useState<AdminReport[]>([])
@@ -67,30 +71,31 @@ export default function OfficerDashboard() {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   useEffect(() => {
-    fetchCurrentUser()
-  }, [])
-
-  useEffect(() => {
-    if (currentOfficerId) {
-      fetchReports()
-    }
-  }, [filters, currentOfficerId])
-
-  const fetchCurrentUser = async () => {
-    try {
-      const { user } = await apiMe()
-      if (user.role === 'officer' || user.role === 'admin') {
+    const checkAuth = async () => {
+      try {
+        const { user } = await apiMe()
+        if (user.role !== 'officer' && user.role !== 'admin') {
+          router.push('/login')
+          return
+        }
+        setIsAuthenticated(true)
         setCurrentOfficerId(user.id)
         setCurrentOfficerName(user.fullName || user.email)
-      }
-    } catch (error) {
-      console.error('Failed to fetch current user:', error)
-      // If not authenticated, redirect to login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+      } catch (error) {
+        console.error('Authentication failed:', error)
+        router.push('/login')
+      } finally {
+        setAuthLoading(false)
       }
     }
-  }
+    checkAuth()
+  }, [router])
+
+  useEffect(() => {
+    if (currentOfficerId && isAuthenticated) {
+      fetchReports()
+    }
+  }, [filters, currentOfficerId, isAuthenticated])
 
   const fetchReports = async () => {
     setLoading(true)
@@ -246,6 +251,19 @@ export default function OfficerDashboard() {
       default:
         return 'bg-slate-500/10 text-slate-400 border-slate-500/20'
     }
+  }
+
+  // Don't render until authenticated
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="text-white">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null // Will redirect
   }
 
   return (
