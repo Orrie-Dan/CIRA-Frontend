@@ -25,11 +25,11 @@ export default function LoginPage() {
       await apiLogin(email, password)
       const { user } = await apiMe()
       if (user.role === 'admin') {
-        router.push('/admin')
+        router.replace('/admin')
       } else if (user.role === 'officer') {
-        router.push('/officer')
+        router.replace('/officer')
       } else {
-        router.push('/')
+        router.replace('/')
       }
     } catch (err: any) {
       let errorMessage = err.message || 'Login failed'

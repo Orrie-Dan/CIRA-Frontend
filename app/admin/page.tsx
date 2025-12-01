@@ -204,15 +204,25 @@ export default function AdminDashboard() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check if token exists first to avoid unnecessary API calls
+        if (typeof window !== 'undefined') {
+          const token = localStorage.getItem('auth_token')
+          if (!token) {
+            router.replace('/login')
+            setAuthLoading(false)
+            return
+          }
+        }
+        
         const { user } = await apiMe()
         if (user.role !== 'admin') {
-          router.push('/login')
+          router.replace('/login')
           return
         }
         setIsAuthenticated(true)
       } catch (error) {
         console.error('Authentication failed:', error)
-        router.push('/login')
+        router.replace('/login')
       } finally {
         setAuthLoading(false)
       }

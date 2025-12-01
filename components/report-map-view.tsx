@@ -97,6 +97,7 @@ export function ReportMapView() {
   const [loadingGeocode, setLoadingGeocode] = useState(false)
   const [selectedMarker, setSelectedMarker] = useState<[number, number] | null>(null)
   const [leafletMap, setLeafletMap] = useState<LeafletMap | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleMapClick = async (lat: number, lng: number) => {
     setPendingLatLng([lat, lng])
@@ -138,6 +139,7 @@ export function ReportMapView() {
   const handleSubmitReport = async (values: ReportFormValues, photos: File[] = []) => {
     if (!pendingLatLng) return setShowReportForm(false)
     
+    setIsSubmitting(true)
     try {
       // Create report via API
       const report = await apiCreateReport({
@@ -166,7 +168,8 @@ export function ReportMapView() {
 
       toast({
         title: 'Success',
-        description: 'Report submitted successfully!',
+        description: `Report submitted successfully! Your report ID is ${report.id.substring(0, 8).toUpperCase()}.`,
+        duration: 5000,
       })
 
       setShowReportForm(false)
@@ -180,6 +183,8 @@ export function ReportMapView() {
         description: error.message || 'Failed to submit report',
         variant: 'destructive',
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -267,7 +272,16 @@ export function ReportMapView() {
         </Card>
 
         {/* Report dialog */}
-        <Dialog open={showReportForm} onOpenChange={setShowReportForm}>
+        <Dialog open={showReportForm} onOpenChange={(open) => {
+          if (!isSubmitting) {
+            setShowReportForm(open)
+            if (!open) {
+              setPendingLatLng(null)
+              setSelectedMarker(null)
+              setGeocodedData(null)
+            }
+          }
+        }}>
           <DialogContent className="max-h-[95vh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Report an Issue</DialogTitle>
@@ -276,12 +290,15 @@ export function ReportMapView() {
               <ReportForm
                 onSubmit={handleSubmitReport}
                 onCancel={() => {
-                  setShowReportForm(false)
-                  setPendingLatLng(null)
-                  setSelectedMarker(null)
-                  setGeocodedData(null)
+                  if (!isSubmitting) {
+                    setShowReportForm(false)
+                    setPendingLatLng(null)
+                    setSelectedMarker(null)
+                    setGeocodedData(null)
+                  }
                 }}
                 defaultValues={geocodedData || undefined}
+                isSubmitting={isSubmitting}
               />
             </div>
           </DialogContent>

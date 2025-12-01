@@ -134,6 +134,7 @@ export function MapSection() {
   const [submittedReportId, setSubmittedReportId] = useState<string | null>(null)
   const [copiedShort, setCopiedShort] = useState(false)
   const [copiedFull, setCopiedFull] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const getMarkerColor = useCallback((type: string) => {
     switch (type) {
@@ -222,6 +223,7 @@ export function MapSection() {
   const handleSubmitReport = async (values: ReportFormValues, photos: File[] = []) => {
     if (!pendingLatLng) return setShowReportForm(false)
     
+    setIsSubmitting(true)
     try {
       // Create report via API
       const report = await apiCreateReport({
@@ -280,6 +282,8 @@ export function MapSection() {
         description: error.message || 'Failed to submit report',
         variant: 'destructive',
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -461,7 +465,14 @@ export function MapSection() {
           </Card>
 
           {/* Report dialog */}
-          <Dialog open={showReportForm} onOpenChange={setShowReportForm}>
+          <Dialog open={showReportForm} onOpenChange={(open) => {
+            if (!isSubmitting) {
+              setShowReportForm(open)
+              if (!open) {
+                setPendingLatLng(null)
+              }
+            }
+          }}>
             <DialogContent className="max-h-[95vh] flex flex-col">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle>Report an Issue</DialogTitle>
@@ -469,7 +480,13 @@ export function MapSection() {
               <div className="flex-1 overflow-y-auto pr-2 -mr-2">
                 <ReportForm
                   onSubmit={handleSubmitReport}
-                  onCancel={() => setShowReportForm(false)}
+                  onCancel={() => {
+                    if (!isSubmitting) {
+                      setShowReportForm(false)
+                      setPendingLatLng(null)
+                    }
+                  }}
+                  isSubmitting={isSubmitting}
                 />
               </div>
             </DialogContent>

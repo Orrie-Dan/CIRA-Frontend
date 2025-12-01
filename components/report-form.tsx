@@ -30,10 +30,12 @@ export function ReportForm({
   onSubmit,
   defaultValues,
   onCancel,
+  isSubmitting = false,
 }: {
   onSubmit: (values: ReportFormValues, photos: File[]) => void
   defaultValues?: Partial<ReportFormValues>
   onCancel?: () => void
+  isSubmitting?: boolean
 }) {
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
@@ -428,6 +430,7 @@ export function ReportForm({
               variant="ghost" 
               onClick={onCancel}
               className="w-full sm:w-auto"
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
@@ -435,8 +438,9 @@ export function ReportForm({
           <Button 
             type="submit"
             className="w-full sm:w-auto"
+            disabled={isSubmitting}
           >
-            Submit Report
+            {isSubmitting ? 'Submitting...' : 'Submit Report'}
           </Button>
         </div>
       </form>

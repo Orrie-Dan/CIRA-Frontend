@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
         })
         // Redirect to login after a short delay
         setTimeout(() => {
-          router.push('/login')
+          router.replace('/login')
         }, 2000)
       }
     }
@@ -100,7 +100,7 @@ export default function AnalyticsPage() {
           description: 'Please log in to view analytics',
           variant: 'destructive',
         })
-        router.push('/login')
+        router.replace('/login')
       } else {
         toast({
           title: 'Error',

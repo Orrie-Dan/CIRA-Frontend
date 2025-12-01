@@ -73,9 +73,19 @@ export default function OfficerDashboard() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Check if token exists first to avoid unnecessary API calls
+        if (typeof window !== 'undefined') {
+          const token = localStorage.getItem('auth_token')
+          if (!token) {
+            router.replace('/login')
+            setAuthLoading(false)
+            return
+          }
+        }
+        
         const { user } = await apiMe()
         if (user.role !== 'officer' && user.role !== 'admin') {
-          router.push('/login')
+          router.replace('/login')
           return
         }
         setIsAuthenticated(true)
@@ -83,7 +93,7 @@ export default function OfficerDashboard() {
         setCurrentOfficerName(user.fullName || user.email)
       } catch (error) {
         console.error('Authentication failed:', error)
-        router.push('/login')
+        router.replace('/login')
       } finally {
         setAuthLoading(false)
       }
