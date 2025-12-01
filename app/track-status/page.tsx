@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FileSearch, AlertCircle } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
-export default function TrackStatusPage() {
+function TrackStatusForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [reportId, setReportId] = useState('')
@@ -80,8 +80,16 @@ export default function TrackStatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-12 px-4">
-      <div className="container mx-auto max-w-2xl">
+    <div 
+      className="min-h-screen py-12 px-4 relative"
+      style={{
+        backgroundImage: 'url(/Infrastructure.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <div className="container mx-auto max-w-2xl relative z-10">
         <Card>
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -136,6 +144,40 @@ export default function TrackStatusPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function TrackStatusPage() {
+  return (
+    <Suspense fallback={
+      <div 
+        className="min-h-screen py-12 px-4 relative"
+        style={{
+          backgroundImage: 'url(/Infrastructure.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        <div className="container mx-auto max-w-2xl relative z-10">
+          <Card>
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <FileSearch className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <CardTitle className="text-2xl">Track Report Status</CardTitle>
+              <CardDescription>
+                Loading...
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    }>
+      <TrackStatusForm />
+    </Suspense>
   )
 }
 
