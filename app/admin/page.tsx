@@ -599,6 +599,93 @@ export default function AdminDashboard() {
     setCurrentPage(1)
   }, [filterProvince, filterDistrict, filterSector, filterStatus, filterType, filterSeverity, searchQuery, dateRange])
 
+  // Filter reports based on all filters
+  const filteredReports = reports.filter(report => {
+    if (filterProvince && report.province?.trim() !== filterProvince) return false
+    if (filterDistrict && report.district?.trim() !== filterDistrict) return false
+    if (filterSector && report.sector?.trim() !== filterSector) return false
+    if (filterStatus && report.status !== filterStatus) return false
+    if (filterType && report.type !== filterType) return false
+    if (filterSeverity && report.severity !== filterSeverity) return false
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      if (!report.title.toLowerCase().includes(query) && 
+          !report.description.toLowerCase().includes(query)) {
+        return false
+      }
+    }
+    // Advanced search: Reporter
+    if (searchReporter) {
+      const query = searchReporter.toLowerCase()
+      if (!report.reporter?.email?.toLowerCase().includes(query) &&
+          !report.reporter?.fullName?.toLowerCase().includes(query)) {
+        return false
+      }
+    }
+    // Advanced search: Assignee
+    if (searchAssignee) {
+      const query = searchAssignee.toLowerCase()
+      const assigneeEmail = report.currentAssignment?.assignee?.email?.toLowerCase() || ''
+      const assigneeName = report.currentAssignment?.assignee?.fullName?.toLowerCase() || ''
+      const orgName = report.currentAssignment?.organization?.name?.toLowerCase() || ''
+      if (!assigneeEmail.includes(query) && !assigneeName.includes(query) && !orgName.includes(query)) {
+        return false
+      }
+    }
+    // Date range filter
+    if (dateRange.from || dateRange.to) {
+      const reportDate = new Date(report.createdAt)
+      if (dateRange.from) {
+        const fromDate = new Date(dateRange.from)
+        fromDate.setHours(0, 0, 0, 0)
+        if (reportDate < fromDate) return false
+      }
+      if (dateRange.to) {
+        const toDate = new Date(dateRange.to)
+        toDate.setHours(23, 59, 59, 999)
+        if (reportDate > toDate) return false
+      }
+    }
+    return true
+  })
+
+  // Calculate map bounds from filtered reports
+  const mapCenterAndBounds = useMemo(() => {
+    const reportsWithLocation = filteredReports.filter(r => r.latitude && r.longitude)
+    if (reportsWithLocation.length === 0) {
+      return { center: [-1.9441, 30.0619] as [number, number], zoom: 11 } // Default to Kigali
+    }
+    
+    const lats = reportsWithLocation.map(r => r.latitude!)
+    const lngs = reportsWithLocation.map(r => r.longitude!)
+    const minLat = Math.min(...lats)
+    const maxLat = Math.max(...lats)
+    const minLng = Math.min(...lngs)
+    const maxLng = Math.max(...lngs)
+    
+    const centerLat = (minLat + maxLat) / 2
+    const centerLng = (minLng + maxLng) / 2
+    
+    // Calculate zoom level based on bounds
+    const latDiff = maxLat - minLat
+    const lngDiff = maxLng - minLng
+    const maxDiff = Math.max(latDiff, lngDiff)
+    
+    let zoom = 11
+    if (maxDiff > 0.5) zoom = 8
+    else if (maxDiff > 0.2) zoom = 9
+    else if (maxDiff > 0.1) zoom = 10
+    else if (maxDiff > 0.05) zoom = 11
+    else if (maxDiff > 0.02) zoom = 12
+    else zoom = 13
+    
+    return {
+      center: [centerLat, centerLng] as [number, number],
+      zoom,
+      bounds: [[minLat, minLng], [maxLat, maxLng]] as [[number, number], [number, number]]
+    }
+  }, [filteredReports])
+
   // Don't render content until authenticated
   if (authLoading) {
     return (
@@ -765,93 +852,6 @@ export default function AdminDashboard() {
 
     return days
   })()
-
-  // Filter reports based on all filters
-  const filteredReports = reports.filter(report => {
-    if (filterProvince && report.province?.trim() !== filterProvince) return false
-    if (filterDistrict && report.district?.trim() !== filterDistrict) return false
-    if (filterSector && report.sector?.trim() !== filterSector) return false
-    if (filterStatus && report.status !== filterStatus) return false
-    if (filterType && report.type !== filterType) return false
-    if (filterSeverity && report.severity !== filterSeverity) return false
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      if (!report.title.toLowerCase().includes(query) && 
-          !report.description.toLowerCase().includes(query)) {
-        return false
-      }
-    }
-    // Advanced search: Reporter
-    if (searchReporter) {
-      const query = searchReporter.toLowerCase()
-      if (!report.reporter?.email?.toLowerCase().includes(query) &&
-          !report.reporter?.fullName?.toLowerCase().includes(query)) {
-        return false
-      }
-    }
-    // Advanced search: Assignee
-    if (searchAssignee) {
-      const query = searchAssignee.toLowerCase()
-      const assigneeEmail = report.currentAssignment?.assignee?.email?.toLowerCase() || ''
-      const assigneeName = report.currentAssignment?.assignee?.fullName?.toLowerCase() || ''
-      const orgName = report.currentAssignment?.organization?.name?.toLowerCase() || ''
-      if (!assigneeEmail.includes(query) && !assigneeName.includes(query) && !orgName.includes(query)) {
-        return false
-      }
-    }
-    // Date range filter
-    if (dateRange.from || dateRange.to) {
-      const reportDate = new Date(report.createdAt)
-      if (dateRange.from) {
-        const fromDate = new Date(dateRange.from)
-        fromDate.setHours(0, 0, 0, 0)
-        if (reportDate < fromDate) return false
-      }
-      if (dateRange.to) {
-        const toDate = new Date(dateRange.to)
-        toDate.setHours(23, 59, 59, 999)
-        if (reportDate > toDate) return false
-      }
-    }
-    return true
-  })
-
-  // Calculate map bounds from filtered reports
-  const mapCenterAndBounds = useMemo(() => {
-    const reportsWithLocation = filteredReports.filter(r => r.latitude && r.longitude)
-    if (reportsWithLocation.length === 0) {
-      return { center: [-1.9441, 30.0619] as [number, number], zoom: 11 } // Default to Kigali
-    }
-    
-    const lats = reportsWithLocation.map(r => r.latitude!)
-    const lngs = reportsWithLocation.map(r => r.longitude!)
-    const minLat = Math.min(...lats)
-    const maxLat = Math.max(...lats)
-    const minLng = Math.min(...lngs)
-    const maxLng = Math.max(...lngs)
-    
-    const centerLat = (minLat + maxLat) / 2
-    const centerLng = (minLng + maxLng) / 2
-    
-    // Calculate zoom level based on bounds
-    const latDiff = maxLat - minLat
-    const lngDiff = maxLng - minLng
-    const maxDiff = Math.max(latDiff, lngDiff)
-    
-    let zoom = 11
-    if (maxDiff > 0.5) zoom = 8
-    else if (maxDiff > 0.2) zoom = 9
-    else if (maxDiff > 0.1) zoom = 10
-    else if (maxDiff > 0.05) zoom = 11
-    else if (maxDiff > 0.02) zoom = 12
-    else zoom = 13
-    
-    return {
-      center: [centerLat, centerLng] as [number, number],
-      zoom,
-      bounds: [[minLat, minLng], [maxLat, maxLng]] as [[number, number], [number, number]]
-    }
-  }, [filteredReports])
 
   // Helper function to format time ago
   const formatTimeAgo = (date: string): string => {
