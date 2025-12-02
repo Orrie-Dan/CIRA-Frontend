@@ -239,20 +239,6 @@ export default function AdminDashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchReports()
-      fetchUsersAndOrgs()
-      fetchOfficerMetrics()
-      fetchGeographicData()
-    }
-  }, [isAuthenticated])
-
-  // Debug: Log users state changes
-  useEffect(() => {
-    console.log('Users state changed:', { count: users.length, users })
-  }, [users])
-
   const fetchUsersAndOrgs = async () => {
     setUsersLoading(true)
     setUsersError(null)
@@ -305,32 +291,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Compute filtered geographic data based on selections
-  const filteredGeographicData = useMemo(() => {
-    if (!geographicData) return null
-    
-    let filteredDistricts = geographicData.districts
-    let filteredSectors = geographicData.sectors
-    
-    // Filter districts by selected province
-    if (selectedProvince) {
-      filteredDistricts = geographicData.districts.filter(d => d.province === selectedProvince)
-      // Also filter sectors by province
-      filteredSectors = geographicData.sectors.filter(s => s.province === selectedProvince)
-    }
-    
-    // Filter sectors by selected district (only if district is selected)
-    if (selectedDistrict) {
-      filteredSectors = filteredSectors.filter(s => s.district === selectedDistrict)
-    }
-    
-    return {
-      provinces: geographicData.provinces,
-      districts: filteredDistricts,
-      sectors: filteredSectors,
-    }
-  }, [geographicData, selectedProvince, selectedDistrict])
-
   const fetchOfficerMetrics = async () => {
     setOfficerMetricsLoading(true)
     try {
@@ -365,28 +325,40 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleViewReport = async (report: AdminReport) => {
-    // Always fetch fresh data when opening a report to ensure we have the latest assignment status
-    // This is especially important for reports that were auto-assigned previously
-    try {
-      const updatedReports = await fetchReports()
-      const freshReport = updatedReports.find(r => r.id === report.id) || report
-      setSelectedReport(freshReport)
-      setIsDetailOpen(true)
-      // Reset the detail key to ensure fresh fetch in ReportDetailView
-      setReportDetailKey(prev => prev + 1)
-    } catch (error) {
-      // If fetch fails, still open with the report from the list
-      console.error('Failed to refresh reports before viewing:', error)
-      setSelectedReport(report)
-      setIsDetailOpen(true)
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchReports()
+      fetchUsersAndOrgs()
+      fetchOfficerMetrics()
+      fetchGeographicData()
     }
-  }
+  }, [isAuthenticated])
 
-  const handleReportUpdated = () => {
-    fetchReports()
-    setIsDetailOpen(false)
-  }
+  // Compute filtered geographic data based on selections
+  const filteredGeographicData = useMemo(() => {
+    if (!geographicData) return null
+    
+    let filteredDistricts = geographicData.districts
+    let filteredSectors = geographicData.sectors
+    
+    // Filter districts by selected province
+    if (selectedProvince) {
+      filteredDistricts = geographicData.districts.filter(d => d.province === selectedProvince)
+      // Also filter sectors by province
+      filteredSectors = geographicData.sectors.filter(s => s.province === selectedProvince)
+    }
+    
+    // Filter sectors by selected district (only if district is selected)
+    if (selectedDistrict) {
+      filteredSectors = filteredSectors.filter(s => s.district === selectedDistrict)
+    }
+    
+    return {
+      provinces: geographicData.provinces,
+      districts: filteredDistricts,
+      sectors: filteredSectors,
+    }
+  }, [geographicData, selectedProvince, selectedDistrict])
 
   // Calculate statistics
   const stats = useMemo(() => ({
@@ -1282,6 +1254,26 @@ export default function AdminDashboard() {
         description: error.message || 'Failed to assign report',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleViewReport = (report: AdminReport) => {
+    setSelectedReport(report)
+    setIsDetailOpen(true)
+  }
+
+  const handleReportUpdated = async () => {
+    // Refresh reports when a report is updated in the detail view
+    const updatedReports = await fetchReports()
+    await fetchOfficerMetrics()
+    
+    // Update the selected report with fresh data
+    if (selectedReport) {
+      const updatedReport = updatedReports.find(r => r.id === selectedReport.id)
+      if (updatedReport) {
+        setSelectedReport(updatedReport)
+        setReportDetailKey(prev => prev + 1)
+      }
     }
   }
 
