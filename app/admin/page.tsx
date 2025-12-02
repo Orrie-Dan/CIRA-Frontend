@@ -204,25 +204,15 @@ export default function AdminDashboard() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Check if token exists first to avoid unnecessary API calls
-        if (typeof window !== 'undefined') {
-          const token = localStorage.getItem('auth_token')
-          if (!token) {
-            router.replace('/login')
-            setAuthLoading(false)
-            return
-          }
-        }
-        
         const { user } = await apiMe()
         if (user.role !== 'admin') {
-          router.replace('/login')
+          router.push('/login')
           return
         }
         setIsAuthenticated(true)
       } catch (error) {
         console.error('Authentication failed:', error)
-        router.replace('/login')
+        router.push('/login')
       } finally {
         setAuthLoading(false)
       }
@@ -238,6 +228,20 @@ export default function AdminDashboard() {
       })
     }
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchReports()
+      fetchUsersAndOrgs()
+      fetchOfficerMetrics()
+      fetchGeographicData()
+    }
+  }, [isAuthenticated])
+
+  // Debug: Log users state changes
+  useEffect(() => {
+    console.log('Users state changed:', { count: users.length, users })
+  }, [users])
 
   const fetchUsersAndOrgs = async () => {
     setUsersLoading(true)
@@ -291,6 +295,32 @@ export default function AdminDashboard() {
     }
   }
 
+  // Compute filtered geographic data based on selections
+  const filteredGeographicData = useMemo(() => {
+    if (!geographicData) return null
+    
+    let filteredDistricts = geographicData.districts
+    let filteredSectors = geographicData.sectors
+    
+    // Filter districts by selected province
+    if (selectedProvince) {
+      filteredDistricts = geographicData.districts.filter(d => d.province === selectedProvince)
+      // Also filter sectors by province
+      filteredSectors = geographicData.sectors.filter(s => s.province === selectedProvince)
+    }
+    
+    // Filter sectors by selected district (only if district is selected)
+    if (selectedDistrict) {
+      filteredSectors = filteredSectors.filter(s => s.district === selectedDistrict)
+    }
+    
+    return {
+      provinces: geographicData.provinces,
+      districts: filteredDistricts,
+      sectors: filteredSectors,
+    }
+  }, [geographicData, selectedProvince, selectedDistrict])
+
   const fetchOfficerMetrics = async () => {
     setOfficerMetricsLoading(true)
     try {
@@ -325,49 +355,37 @@ export default function AdminDashboard() {
     }
   }
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchReports()
-      fetchUsersAndOrgs()
-      fetchOfficerMetrics()
-      fetchGeographicData()
+  const handleViewReport = async (report: AdminReport) => {
+    // Always fetch fresh data when opening a report to ensure we have the latest assignment status
+    // This is especially important for reports that were auto-assigned previously
+    try {
+      const updatedReports = await fetchReports()
+      const freshReport = updatedReports.find(r => r.id === report.id) || report
+      setSelectedReport(freshReport)
+      setIsDetailOpen(true)
+      // Reset the detail key to ensure fresh fetch in ReportDetailView
+      setReportDetailKey(prev => prev + 1)
+    } catch (error) {
+      // If fetch fails, still open with the report from the list
+      console.error('Failed to refresh reports before viewing:', error)
+      setSelectedReport(report)
+      setIsDetailOpen(true)
     }
-  }, [isAuthenticated])
+  }
 
-  // Compute filtered geographic data based on selections
-  const filteredGeographicData = useMemo(() => {
-    if (!geographicData) return null
-    
-    let filteredDistricts = geographicData.districts
-    let filteredSectors = geographicData.sectors
-    
-    // Filter districts by selected province
-    if (selectedProvince) {
-      filteredDistricts = geographicData.districts.filter(d => d.province === selectedProvince)
-      // Also filter sectors by province
-      filteredSectors = geographicData.sectors.filter(s => s.province === selectedProvince)
-    }
-    
-    // Filter sectors by selected district (only if district is selected)
-    if (selectedDistrict) {
-      filteredSectors = filteredSectors.filter(s => s.district === selectedDistrict)
-    }
-    
-    return {
-      provinces: geographicData.provinces,
-      districts: filteredDistricts,
-      sectors: filteredSectors,
-    }
-  }, [geographicData, selectedProvince, selectedDistrict])
+  const handleReportUpdated = () => {
+    fetchReports()
+    setIsDetailOpen(false)
+  }
 
   // Calculate statistics
-  const stats = useMemo(() => ({
+  const stats = {
     total: reports.length,
     new: reports.filter(r => r.status === 'new').length,
     inProgress: reports.filter(r => r.status === 'in_progress').length,
     resolved: reports.filter(r => r.status === 'resolved').length,
     high: reports.filter(r => r.severity === 'high').length,
-  }), [reports])
+  }
 
   // Urgent reports (high severity, unresolved)
   const urgentReports = reports
@@ -492,7 +510,7 @@ export default function AdminDashboard() {
   })()
 
   // Reports by province
-  const provinceData = useMemo(() => {
+  const provinceData = (() => {
     const provinceMap = new Map<string, number>()
     reports.forEach(report => {
       const province = report.province?.trim()
@@ -503,10 +521,10 @@ export default function AdminDashboard() {
     return Array.from(provinceMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  }, [reports])
+  })()
 
   // Reports by district (filtered by province if selected)
-  const districtData = useMemo(() => {
+  const districtData = (() => {
     const districtMap = new Map<string, number>()
     const reportsToUse = filterProvince 
       ? reports.filter(report => report.province?.trim() === filterProvince)
@@ -521,10 +539,10 @@ export default function AdminDashboard() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10) // Top 10 districts
-  }, [reports, filterProvince])
+  })()
 
   // Reports by sector (filtered by district and province if selected)
-  const sectorData = useMemo(() => {
+  const sectorData = (() => {
     const sectorMap = new Map<string, number>()
     let reportsToUse = reports
     if (filterProvince) {
@@ -543,9 +561,9 @@ export default function AdminDashboard() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10) // Top 10 sectors
-  }, [reports, filterProvince, filterDistrict])
+  })()
 
-  // Debug: Log data availability - only depend on reports to prevent infinite loops
+  // Debug: Log data availability
   useEffect(() => {
     if (reports.length > 0) {
       console.log('Dashboard Statistics:', stats)
@@ -574,7 +592,7 @@ export default function AdminDashboard() {
       console.log('District data for chart:', districtData)
       console.log('Sector data for chart:', sectorData)
     }
-  }, [reports]) // Only depend on reports - computed values are memoized and will be logged when reports change
+  }, [reports, stats, provinceData, districtData, sectorData])
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -748,57 +766,55 @@ export default function AdminDashboard() {
     return days
   })()
 
-  // Filter reports based on all filters - MEMOIZED to prevent infinite re-renders
-  const filteredReports = useMemo(() => {
-    return reports.filter(report => {
-      if (filterProvince && report.province?.trim() !== filterProvince) return false
-      if (filterDistrict && report.district?.trim() !== filterDistrict) return false
-      if (filterSector && report.sector?.trim() !== filterSector) return false
-      if (filterStatus && report.status !== filterStatus) return false
-      if (filterType && report.type !== filterType) return false
-      if (filterSeverity && report.severity !== filterSeverity) return false
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        if (!report.title.toLowerCase().includes(query) && 
-            !report.description.toLowerCase().includes(query)) {
-          return false
-        }
+  // Filter reports based on all filters
+  const filteredReports = reports.filter(report => {
+    if (filterProvince && report.province?.trim() !== filterProvince) return false
+    if (filterDistrict && report.district?.trim() !== filterDistrict) return false
+    if (filterSector && report.sector?.trim() !== filterSector) return false
+    if (filterStatus && report.status !== filterStatus) return false
+    if (filterType && report.type !== filterType) return false
+    if (filterSeverity && report.severity !== filterSeverity) return false
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      if (!report.title.toLowerCase().includes(query) && 
+          !report.description.toLowerCase().includes(query)) {
+        return false
       }
-      // Advanced search: Reporter
-      if (searchReporter) {
-        const query = searchReporter.toLowerCase()
-        if (!report.reporter?.email?.toLowerCase().includes(query) &&
-            !report.reporter?.fullName?.toLowerCase().includes(query)) {
-          return false
-        }
+    }
+    // Advanced search: Reporter
+    if (searchReporter) {
+      const query = searchReporter.toLowerCase()
+      if (!report.reporter?.email?.toLowerCase().includes(query) &&
+          !report.reporter?.fullName?.toLowerCase().includes(query)) {
+        return false
       }
-      // Advanced search: Assignee
-      if (searchAssignee) {
-        const query = searchAssignee.toLowerCase()
-        const assigneeEmail = report.currentAssignment?.assignee?.email?.toLowerCase() || ''
-        const assigneeName = report.currentAssignment?.assignee?.fullName?.toLowerCase() || ''
-        const orgName = report.currentAssignment?.organization?.name?.toLowerCase() || ''
-        if (!assigneeEmail.includes(query) && !assigneeName.includes(query) && !orgName.includes(query)) {
-          return false
-        }
+    }
+    // Advanced search: Assignee
+    if (searchAssignee) {
+      const query = searchAssignee.toLowerCase()
+      const assigneeEmail = report.currentAssignment?.assignee?.email?.toLowerCase() || ''
+      const assigneeName = report.currentAssignment?.assignee?.fullName?.toLowerCase() || ''
+      const orgName = report.currentAssignment?.organization?.name?.toLowerCase() || ''
+      if (!assigneeEmail.includes(query) && !assigneeName.includes(query) && !orgName.includes(query)) {
+        return false
       }
-      // Date range filter
-      if (dateRange.from || dateRange.to) {
-        const reportDate = new Date(report.createdAt)
-        if (dateRange.from) {
-          const fromDate = new Date(dateRange.from)
-          fromDate.setHours(0, 0, 0, 0)
-          if (reportDate < fromDate) return false
-        }
-        if (dateRange.to) {
-          const toDate = new Date(dateRange.to)
-          toDate.setHours(23, 59, 59, 999)
-          if (reportDate > toDate) return false
-        }
+    }
+    // Date range filter
+    if (dateRange.from || dateRange.to) {
+      const reportDate = new Date(report.createdAt)
+      if (dateRange.from) {
+        const fromDate = new Date(dateRange.from)
+        fromDate.setHours(0, 0, 0, 0)
+        if (reportDate < fromDate) return false
       }
-      return true
-    })
-  }, [reports, filterProvince, filterDistrict, filterSector, filterStatus, filterType, filterSeverity, searchQuery, searchReporter, searchAssignee, dateRange])
+      if (dateRange.to) {
+        const toDate = new Date(dateRange.to)
+        toDate.setHours(23, 59, 59, 999)
+        if (reportDate > toDate) return false
+      }
+    }
+    return true
+  })
 
   // Calculate map bounds from filtered reports
   const mapCenterAndBounds = useMemo(() => {
@@ -1254,26 +1270,6 @@ export default function AdminDashboard() {
         description: error.message || 'Failed to assign report',
         variant: 'destructive',
       })
-    }
-  }
-
-  const handleViewReport = (report: AdminReport) => {
-    setSelectedReport(report)
-    setIsDetailOpen(true)
-  }
-
-  const handleReportUpdated = async () => {
-    // Refresh reports when a report is updated in the detail view
-    const updatedReports = await fetchReports()
-    await fetchOfficerMetrics()
-    
-    // Update the selected report with fresh data
-    if (selectedReport) {
-      const updatedReport = updatedReports.find(r => r.id === selectedReport.id)
-      if (updatedReport) {
-        setSelectedReport(updatedReport)
-        setReportDetailKey(prev => prev + 1)
-      }
     }
   }
 
