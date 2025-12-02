@@ -389,13 +389,13 @@ export default function AdminDashboard() {
   }
 
   // Calculate statistics
-  const stats = {
+  const stats = useMemo(() => ({
     total: reports.length,
     new: reports.filter(r => r.status === 'new').length,
     inProgress: reports.filter(r => r.status === 'in_progress').length,
     resolved: reports.filter(r => r.status === 'resolved').length,
     high: reports.filter(r => r.severity === 'high').length,
-  }
+  }), [reports])
 
   // Urgent reports (high severity, unresolved)
   const urgentReports = reports
@@ -520,7 +520,7 @@ export default function AdminDashboard() {
   })()
 
   // Reports by province
-  const provinceData = (() => {
+  const provinceData = useMemo(() => {
     const provinceMap = new Map<string, number>()
     reports.forEach(report => {
       const province = report.province?.trim()
@@ -531,10 +531,10 @@ export default function AdminDashboard() {
     return Array.from(provinceMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  })()
+  }, [reports])
 
   // Reports by district (filtered by province if selected)
-  const districtData = (() => {
+  const districtData = useMemo(() => {
     const districtMap = new Map<string, number>()
     const reportsToUse = filterProvince 
       ? reports.filter(report => report.province?.trim() === filterProvince)
@@ -549,10 +549,10 @@ export default function AdminDashboard() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10) // Top 10 districts
-  })()
+  }, [reports, filterProvince])
 
   // Reports by sector (filtered by district and province if selected)
-  const sectorData = (() => {
+  const sectorData = useMemo(() => {
     const sectorMap = new Map<string, number>()
     let reportsToUse = reports
     if (filterProvince) {
@@ -571,7 +571,7 @@ export default function AdminDashboard() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10) // Top 10 sectors
-  })()
+  }, [reports, filterProvince, filterDistrict])
 
   // Debug: Log data availability
   useEffect(() => {
